@@ -2,6 +2,7 @@ import { type Module, inject } from 'langium';
 import { createDefaultModule, createDefaultSharedModule, type DefaultSharedModuleContext, type LangiumServices, type LangiumSharedServices, type PartialLangiumServices } from 'langium/lsp';
 import { LimbooleGeneratedModule, LimbooleGeneratedSharedModule } from './generated/module.js';
 import { LimbooleValidator, registerValidationChecks } from './limboole-validator.js';
+import { LimbooleCodeActionProvider } from './limboole-code-action.js';
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -26,6 +27,9 @@ export type LimbooleServices = LangiumServices & LimbooleAddedServices
 export const LimbooleModule: Module<LimbooleServices, PartialLangiumServices & LimbooleAddedServices> = {
     validation: {
         LimbooleValidator: () => new LimbooleValidator()
+    },
+    lsp: {
+        CodeActionProvider: (services) => new LimbooleCodeActionProvider(services),
     }
 };
 
