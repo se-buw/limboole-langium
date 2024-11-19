@@ -21,11 +21,19 @@ export function registerValidationChecks(services: LimbooleServices) {
  * Implementation of custom validations.
  */
 export class LimbooleValidator {
+
+  services: LimbooleServices;
+
+  constructor(services: LimbooleServices){
+    this.services = services;
+  }
+
   operatorShouldBeBetweenOperands(expr: Expr, accept: ValidationAcceptor): void {
     if (isAnd(expr) || isOr(expr) || isIff(expr) || isImplies(expr)) {
       validateBinaryOperands(expr, accept, expr.$type);
     }
   }
+
 
   checkPersonStartsWithNot(expr: Expr, accept: ValidationAcceptor): void {
     if (expr.var) {
@@ -37,9 +45,8 @@ export class LimbooleValidator {
   }
 
   validateSpelling(expr: Expr, accept: ValidationAcceptor): void {
-    
     if(isExpr(expr) && expr.var !== undefined) { 
-      const typo = checkTypo(expr.var);
+      const typo = checkTypo(expr.var, this.services);
       if(typo !== undefined) {
         accept('hint', `Possible typo detected. Do you mean: ${typo} ? .`, { node: expr, property: 'var', code: 'typo', data: { typo }});
       }

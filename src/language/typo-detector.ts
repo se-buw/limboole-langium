@@ -1,5 +1,5 @@
 import exp from "constants";
-import { expressionCollection } from "./limboole-utils.js";
+import { LimbooleServices } from "./limboole-module.js";
 
 
 /** 
@@ -7,10 +7,9 @@ import { expressionCollection } from "./limboole-utils.js";
  * @param exprStr Current expression to be tested
  * @returns Proposal of an expression name in the document, that could be the intended spelling. 
 */
-export function checkTypo(exprStr: string): string | undefined {
+export function checkTypo(exprStr: string, services: LimbooleServices): string | undefined {
     
-    const expressionMap = expressionCollection.getCollection();
-
+    const expressionMap = services.utils.LimbooleExpressionCollector.getCollection();
 
     if(expressionMap[exprStr].length >= 2 || exprStr.length < 3) return undefined;
 

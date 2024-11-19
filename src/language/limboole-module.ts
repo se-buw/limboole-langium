@@ -3,6 +3,7 @@ import { createDefaultModule, createDefaultSharedModule, type DefaultSharedModul
 import { LimbooleGeneratedModule, LimbooleGeneratedSharedModule } from './generated/module.js';
 import { LimbooleValidator, registerValidationChecks } from './limboole-validator.js';
 import { LimbooleCodeActionProvider } from './limboole-code-action.js';
+import { ExpressionCollection, registerExpressionCollector } from './limboole-expression-collector.js';
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -10,6 +11,9 @@ import { LimbooleCodeActionProvider } from './limboole-code-action.js';
 export type LimbooleAddedServices = {
     validation: {
         LimbooleValidator: LimbooleValidator
+    },
+    utils: {
+        LimbooleExpressionCollector: ExpressionCollection
     }
 }
 
@@ -26,11 +30,14 @@ export type LimbooleServices = LangiumServices & LimbooleAddedServices
  */
 export const LimbooleModule: Module<LimbooleServices, PartialLangiumServices & LimbooleAddedServices> = {
     validation: {
-        LimbooleValidator: () => new LimbooleValidator()
+        LimbooleValidator: (services) => new LimbooleValidator(services),
+    },
+    utils: {
+        LimbooleExpressionCollector: () => new ExpressionCollection()
     },
     lsp: {
         CodeActionProvider: (services) => new LimbooleCodeActionProvider(services),
-    }
+    },
 };
 
 /**
@@ -62,7 +69,11 @@ export function createLimbooleServices(context: DefaultSharedModuleContext): {
         LimbooleModule
     );
     shared.ServiceRegistry.register(Limboole);
+
+
     registerValidationChecks(Limboole);
+    registerExpressionCollector(Limboole);
+
     if (!context.connection) {
         // We don't run inside a language server
         // Therefore, initialize the configuration provider instantly
