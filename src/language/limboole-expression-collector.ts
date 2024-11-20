@@ -2,9 +2,7 @@ import { Expr } from "./generated/ast.js";
 import { LimbooleServices } from "./limboole-module.js";
 import { DocumentState } from "langium";
 
-
-
-export function registerExpressionCollector(services: LimbooleServices){
+export function registerExpressionCollector(services: LimbooleServices) {
     services.shared.workspace.DocumentBuilder.onBuildPhase(DocumentState.Parsed, documents => {
         for (const document of documents) {
             services.utils.LimbooleExpressionCollector.findAllBasicExpressions(document.parseResult.value);
@@ -12,18 +10,18 @@ export function registerExpressionCollector(services: LimbooleServices){
     })
 }
 
-export class ExpressionCollection{
+export class ExpressionCollection {
 
-    expressionMap: {[key: string]: Expr[]};
+    expressionMap: { [key: string]: Expr[] };
 
-    constructor(){
+    constructor() {
         this.expressionMap = {};
     }
 
     findAllBasicExpressions(rootNode: any): void {
         this.resetCollection();
         this.traverseWithStack(rootNode);
-        this.printCollection();
+        //this.printCollection();
     }
 
     addToCollection(expression: string, node: Expr): void {
@@ -32,14 +30,14 @@ export class ExpressionCollection{
         if (this.expressionMap[expression]) {
             this.expressionMap[expression].push(node);
         } else {
-            this.expressionMap[expression] = [node] ;
+            this.expressionMap[expression] = [node];
         }
-    }    
+    }
 
     resetCollection(): void {
         this.expressionMap = {};
     }
-    
+
     getCollection() {
         return this.expressionMap;
     }
@@ -49,7 +47,7 @@ export class ExpressionCollection{
         for (const expression in this.expressionMap) {
             console.log(expression);
         }
-    } 
+    }
 
     addNodeIfCondition(node: any): void {
         if (node.var !== undefined) {
