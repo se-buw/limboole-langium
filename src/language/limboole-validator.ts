@@ -2,8 +2,7 @@ import type { ValidationAcceptor, ValidationChecks } from 'langium';
 import type { LimbooleAstType, Expr, And, Or, Implies, Iff } from './generated/ast.js';
 import { isAnd, isOr, isIff, isImplies, isExpr } from './generated/ast.js';
 import type { LimbooleServices } from './limboole-module.js';
-import { checkTypo} from './typo-detector.js';
-import { DiagnosticSeverity } from 'vscode-languageserver';
+import { checkTypo } from './typo-detector.js';
 
 /**
  * Register custom validation checks.
@@ -12,7 +11,7 @@ export function registerValidationChecks(services: LimbooleServices) {
   const registry = services.validation.ValidationRegistry;
   const validator = services.validation.LimbooleValidator;
   const checks: ValidationChecks<LimbooleAstType> = {
-    Expr: [validator.checkPersonStartsWithNot, validator.operatorShouldBeBetweenOperands, validator.validateSpelling],
+    Expr: [validator.operatorShouldBeBetweenOperands, validator.validateSpelling],
   };
   registry.register(checks, validator);
 }
@@ -24,7 +23,7 @@ export class LimbooleValidator {
 
   services: LimbooleServices;
 
-  constructor(services: LimbooleServices){
+  constructor(services: LimbooleServices) {
     this.services = services;
   }
 
@@ -34,21 +33,11 @@ export class LimbooleValidator {
     }
   }
 
-
-  checkPersonStartsWithNot(expr: Expr, accept: ValidationAcceptor): void {
-    if (expr.var) {
-      // console.log('First character of expr.var:', expr.var);
-      if (expr.var.startsWith('!')) {
-        accept('warning', 'Variable name should start with a capital.', { node: expr, property: 'var' });
-      }
-    }
-  }
-
   validateSpelling(expr: Expr, accept: ValidationAcceptor): void {
-    if(isExpr(expr) && expr.var !== undefined) { 
+    if (isExpr(expr) && expr.var !== undefined) {
       const typo = checkTypo(expr.var, this.services);
-      if(typo !== undefined) {
-        accept('hint', `Possible typo detected. Do you mean: ${typo} ? .`, { node: expr, property: 'var', code: 'typo', data: { typo }});
+      if (typo !== undefined) {
+        accept('hint', `A possible typo was detected. Do you mean: "${typo}"?`, { node: expr, property: 'var', code: 'typo', data: { typo } });
       }
     }
   }
