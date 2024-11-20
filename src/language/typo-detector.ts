@@ -1,6 +1,4 @@
-import exp from "constants";
 import { LimbooleServices } from "./limboole-module.js";
-
 
 /** 
  * Test an expressions against all expressions in the document. 
@@ -8,62 +6,59 @@ import { LimbooleServices } from "./limboole-module.js";
  * @returns Proposal of an expression name in the document, that could be the intended spelling. 
 */
 export function checkTypo(exprStr: string, services: LimbooleServices): string | undefined {
-    
     const expressionMap = services.utils.LimbooleExpressionCollector.getCollection();
 
-    if(expressionMap[exprStr].length >= 2 || exprStr.length < 3) return undefined;
+    if (!expressionMap[exprStr] || expressionMap[exprStr].length >= 2 || exprStr.length < 3) return undefined;
 
-    for(const key in expressionMap) {
-        
-        // if current expression more occurence than the other expression tested, we skip it
-        if(!(expressionMap[exprStr].length > expressionMap[key].length )) {
-            const distance = levenshteinDistance(exprStr, key);
+    for (const key in expressionMap) {
+        if (expressionMap[exprStr].length > expressionMap[key].length) continue;
 
-            // rules shouldnt be too strict
-            if (distance < 2 && distance !== 0) {
-                console.log(`Typo detected: ${exprStr} is similar to ${key}`);
-                return key;
-            }
+        const distance = levenshteinDistance(exprStr, key, 2);
+        if (distance < 2 && distance !== 0) {
+            return key;
         }
     }
 
-    return undefined
+    return undefined;
 }
- 
-function levenshteinDistance(str1: string, str2: string): number {
-    const len1 = str1.length;
-    const len2 = str2.length;
 
-    // Initialize a matrix of size (len1 + 1) x (len2 + 1)
-    const matrix = Array.from(Array(len1 + 1), () => Array(len2 + 1).fill(0));
+function levenshteinDistance(str1: string, str2: string, threshold: number): number {
+    let len1 = str1.length;
+    let len2 = str2.length;
 
-    // Set up the base cases
-    for (let i = 0; i <= len1; i++) {
-        matrix[i][0] = i; // Deletion cost
+    if (Math.abs(len1 - len2) > threshold) return threshold + 1;
+
+    if (len1 < len2) {
+        [str1, str2] = [str2, str1];
+        [len1, len2] = [len2, len1];
     }
+
+    let currentRow = new Array(len2 + 1).fill(0);
     for (let j = 0; j <= len2; j++) {
-        matrix[0][j] = j; // Insertion cost
+        currentRow[j] = j;
     }
 
-    // Fill in the rest of the matrix
     for (let i = 1; i <= len1; i++) {
+        let previousValue = currentRow[0];
+        currentRow[0] = i;
+        let minValue = i;
+
         for (let j = 1; j <= len2; j++) {
-            if (str1[i - 1] === str2[j - 1]) {
-                // No cost if characters are the same
-                matrix[i][j] = matrix[i - 1][j - 1];
-            } else {
-                // Take the minimum of insertion, deletion, or substitution
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j] + 1, // Deletion
-                    matrix[i][j - 1] + 1, // Insertion
-                    matrix[i - 1][j - 1] + 1 // Substitution
-                );
-            }
+            const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+            const newValue = Math.min(
+                currentRow[j - 1] + 1,        // Insertion
+                previousValue + cost,         // Substitution
+                currentRow[j] + 1             // Deletion
+            );
+            previousValue = currentRow[j];
+            currentRow[j] = newValue;
+            minValue = Math.min(minValue, newValue);
         }
+
+        if (minValue > threshold) return threshold + 1;
     }
 
-    // The Levenshtein Distance is in the bottom-right cell
-    return matrix[len1][len2];
+    return currentRow[len2];
 }
 
 
