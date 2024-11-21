@@ -3,58 +3,150 @@ import { EmptyFileSystem, type LangiumDocument } from "langium";
 import { expandToString as s } from "langium/generate";
 import { parseHelper } from "langium/test";
 import { createLimbooleServices } from "../../src/language/limboole-module.js";
-import { Model, isModel } from "../../src/language/generated/ast.js";
+import { Expr, And, Iff, Implies, Or, isExpr, isAnd, isIff, isImplies, isOr } from "../../src/language/generated/ast.js"; // Import the AST types
 
 let services: ReturnType<typeof createLimbooleServices>;
-let parse:    ReturnType<typeof parseHelper<Model>>;
-let document: LangiumDocument<Model> | undefined;
+let parse: ReturnType<typeof parseHelper<Expr>>; // Parsing an Expr type
+let document: LangiumDocument<Expr> | undefined;
 
 beforeAll(async () => {
     services = createLimbooleServices(EmptyFileSystem);
-    parse = parseHelper<Model>(services.Limboole);
+    parse = parseHelper<Expr>(services.Limboole);
 
-    // activate the following if your linking test requires elements from a built-in library, for example
+    // Uncomment this if you need to initialize the workspace or add any libraries
     // await services.shared.workspace.WorkspaceManager.initializeWorkspace([]);
 });
 
 describe('Parsing tests', () => {
 
-    test('parse simple model', async () => {
+    // Test for parsing simple conjunction (AND)
+    test('parse simple expression', async () => {
         document = await parse(`
-            person Langium
-            Hello Langium!
+            VAR x & VAR y
         `);
 
-        // check for absensce of parser errors the classic way:
-        //  deacivated, find a much more human readable way below!
-        // expect(document.parseResult.parserErrors).toHaveLength(0);
-
         expect(
-            // here we use a (tagged) template expression to create a human readable representation
-            //  of the AST part we are interested in and that is to be compared to our expectation;
-            // prior to the tagged template expression we check for validity of the parsed document object
-            //  by means of the reusable function 'checkDocumentValid()' to sort out (critical) typos first;
             checkDocumentValid(document) || s`
-                Persons:
-                  ${document.parseResult.value?.persons?.map(p => p.name)?.join('\n  ')}
-                Greetings to:
-                  ${document.parseResult.value?.greetings?.map(g => g.person.$refText)?.join('\n  ')}
+                Expression:
+                  ${document?.parseResult.value?.$type} 
+                Variables:
+                  ${document?.parseResult.value?.var}
             `
         ).toBe(s`
-            Persons:
-              Langium
-            Greetings to:
-              Langium
+            Expression:
+              And
+            Variables:
+              x
+              y
+        `);
+    });
+
+    // Test for parsing implication (IMPLIES)
+    test('parse implication expression', async () => {
+        document = await parse(`
+            VAR x -> VAR y
+        `);
+
+        expect(
+            checkDocumentValid(document) || s`
+                Expression:
+                  ${document?.parseResult.value?.$type} 
+                Left Variable:
+                  ${document?.parseResult.value?.left?.var}
+                Right Variable:
+                  ${document?.parseResult.value?.right?.var}
+            `
+        ).toBe(s`
+            Expression:
+              Implies
+            Left Variable:
+              x
+            Right Variable:
+              y
+        `);
+    });
+
+    // Test for parsing a more complex expression (AND with IMPLIES)
+    test('parse complex expression', async () => {
+        document = await parse(`
+            VAR x & (VAR y -> VAR z)
+        `);
+
+        expect(
+            checkDocumentValid(document) || s`
+                Expression:
+                  ${document?.parseResult.value?.$type}
+                Left Variable:
+                  ${document?.parseResult.value?.left?.var}
+                Right Expression:
+                  ${document?.parseResult.value?.right?.$type}
+                Right Left Variable:
+                  ${document?.parseResult.value?.right?.left?.var}
+                Right Right Variable:
+                  ${document?.parseResult.value?.right?.right?.var}
+            `
+        ).toBe(s`
+            Expression:
+              And
+            Left Variable:
+              x
+            Right Expression:
+              Implies
+            Right Left Variable:
+              y
+            Right Right Variable:
+              z
+        `);
+    });
+
+    // Test for parsing biconditional (IFF) expression
+    test('parse biconditional expression', async () => {
+        document = await parse(`
+            VAR x <-> VAR y
+        `);
+
+        expect(
+            checkDocumentValid(document) || s`
+                Expression:
+                  ${document?.parseResult.value?.$type}
+                Left Variable:
+                  ${document?.parseResult.value?.left?.var}
+                Right Variable:
+                  ${document?.parseResult.value?.right?.var}
+            `
+        ).toBe(s`
+            Expression:
+              Iff
+            Left Variable:
+              x
+            Right Variable:
+              y
         `);
     });
 });
 
-function checkDocumentValid(document: LangiumDocument): string | undefined {
-    return document.parseResult.parserErrors.length && s`
-        Parser errors:
-          ${document.parseResult.parserErrors.map(e => e.message).join('\n  ')}
-    `
-        || document.parseResult.value === undefined && `ParseResult is 'undefined'.`
-        || !isModel(document.parseResult.value) && `Root AST object is a ${document.parseResult.value.$type}, expected a '${Model}'.`
-        || undefined;
+function checkDocumentValid(document: LangiumDocument<Expr>): string | undefined {
+    if (!document.parseResult.value) {
+        return `ParseResult is 'undefined'.`;
+    }
+
+    // Ensuring correct type inference
+    const value = document.parseResult.value;
+
+    // Use the type guards to check which concrete type the expression is
+    if (isAnd(value)) {
+        return undefined; // No error for And
+    }
+    if (isOr(value)) {
+        return undefined; // No error for Or
+    }
+    if (isImplies(value)) {
+        return undefined; // No error for Implies
+    }
+    if (isIff(value)) {
+        return undefined; // No error for Iff
+    }
+
+    // Return error if none of the type guards matched
+    return `Unknown expression type: ${value.$type}`;
 }
