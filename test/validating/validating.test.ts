@@ -1,66 +1,66 @@
-import { beforeAll, describe, expect, test } from "vitest";
-import { EmptyFileSystem, type LangiumDocument } from "langium";
-import { expandToString as s } from "langium/generate";
-import { parseHelper } from "langium/test";
-import type { Diagnostic } from "vscode-languageserver-types";
+import { describe, expect, test } from "vitest";
+import { EmptyFileSystem } from "langium";
 import { createLimbooleServices } from "../../src/language/limboole-module.js";
-import { Model, isModel } from "../../src/language/generated/ast.js";
+import { parseDocument } from 'langium/test';
 
-let services: ReturnType<typeof createLimbooleServices>;
-let parse:    ReturnType<typeof parseHelper<Model>>;
-let document: LangiumDocument<Model> | undefined;
+import * as fs from 'fs';
+import * as path from 'path';
 
-beforeAll(async () => {
-    services = createLimbooleServices(EmptyFileSystem);
-    const doParse = parseHelper<Model>(services.Limboole);
-    parse = (input: string) => doParse(input, { validation: true });
+const services = createLimbooleServices(EmptyFileSystem).Limboole;
+const resourceDir = path.resolve(__dirname, '../resources/limboole');
+const logFilePath = path.resolve(__dirname, '../resources/test-results.log');
 
-    // activate the following if your linking test requires elements from a built-in library, for example
-    // await services.shared.workspace.WorkspaceManager.initializeWorkspace([]);
-});
 
-describe('Validating', () => {
-  
-    test('check no errors', async () => {
-        document = await parse(`
-            person Langium
-        `);
-
-        expect(
-            // here we first check for validity of the parsed document object by means of the reusable function
-            //  'checkDocumentValid()' to sort out (critical) typos first,
-            // and then evaluate the diagnostics by converting them into human readable strings;
-            // note that 'toHaveLength()' works for arrays and strings alike ;-)
-            checkDocumentValid(document) || document?.diagnostics?.map(diagnosticToString)?.join('\n')
-        ).toHaveLength(0);
-    });
-
-    test('check capital letter validation', async () => {
-        document = await parse(`
-            person langium
-        `);
-
-        expect(
-            checkDocumentValid(document) || document?.diagnostics?.map(diagnosticToString)?.join('\n')
-        ).toEqual(
-            // 'expect.stringContaining()' makes our test robust against future additions of further validation rules
-            expect.stringContaining(s`
-                [1:19..1:26]: Person name should start with a capital.
-            `)
-        );
+describe('Validating Typo Check', () => {
+    /*
+        * The test case is to validate the typo check for the expression "kitten & kiten".
+        * The expected result is to detect a possible typo between "kitten" and "kiten". 
+    **/
+    test('Detects possible typo between kitten & kiten', async () => {
+        try {
+            await assertValidateSpelling(`
+                kitten & kiten
+            `);
+        } catch (error) {
+            throw error;
+        }
     });
 });
 
-function checkDocumentValid(document: LangiumDocument): string | undefined {
-    return document.parseResult.parserErrors.length && s`
-        Parser errors:
-          ${document.parseResult.parserErrors.map(e => e.message).join('\n  ')}
-    `
-        || document.parseResult.value === undefined && `ParseResult is 'undefined'.`
-        || !isModel(document.parseResult.value) && `Root AST object is a ${document.parseResult.value.$type}, expected a '${Model}'.`
-        || undefined;
+describe('Validating Typo Check in FMP Dataset', async () => {
+    const testFiles = fs.readdirSync(resourceDir).filter(file => file.endsWith('.limboole'));
+    for (const file of testFiles) {
+        test(`Detects possible typo in ${file}`, async () => {
+            try {
+                const filePath = path.resolve(resourceDir, file);
+                const limbooleModel = fs.readFileSync(filePath, 'utf-8');
+                await assertValidateSpelling(limbooleModel);
+                // logToFile(`✅Test passed: Detects possible typo in ${filePath}`);
+            } catch (error) {
+                throw error;
+            }
+        });
+    }
+});
+
+
+
+/**
+ * Check if there is a possible typo in the given model text.
+ * If there is a possible typo, there should be a diagnostic with the code 'typo' and diagnostic length should be greater than 0.
+ * @param modelText 
+ */
+async function assertValidateSpelling(modelText: string): Promise<void> {
+    const doc = await parseDocument(services, modelText);
+    const db = services.shared.workspace.DocumentBuilder;
+    await db.build([doc], { validation: true });
+    const diagnostics = doc.diagnostics ?? [];
+    expect(diagnostics.length).toBeGreaterThan(0);
+    const typoDiagnostic = diagnostics.find(d => d.code === 'typo');
+    expect(typoDiagnostic?.message).toContain("A possible typo was detected. Do you mean:");
 }
 
-function diagnosticToString(d: Diagnostic) {
-    return `[${d.range.start.line}:${d.range.start.character}..${d.range.end.line}:${d.range.end.character}]: ${d.message}`;
+
+function logToFile(message: string) {
+    fs.appendFileSync(logFilePath, message + '\n');
 }
