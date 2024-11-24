@@ -1,7 +1,14 @@
+import { AstNode } from 'langium';
 import { Expr } from './generated/ast.js'; // Ensure you import your AST types
 
 // Class to manage the collection of expressions and their corresponding nodes
 class ExpressionCollection {
+    findAllBasicExpressions(value: AstNode) {
+        throw new Error('Method not implemented.');
+    }
+    clear() {
+        throw new Error('Method not implemented.');
+    }
     private expressionMap: { [key: string]: Expr[] };
 
     constructor() {

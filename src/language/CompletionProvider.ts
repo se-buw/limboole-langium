@@ -1,80 +1,119 @@
-import { LangiumCompletionParser, LangiumDocument, LangiumCoreServices } from 'langium';
-import { CompletionItem, CompletionItemKind, Position } from 'vscode-languageserver';
+import { LangiumCompletionParser, LangiumDocument, LangiumCoreServices, MaybePromise } from 'langium';
+import { CancellationToken, CompletionItem, CompletionItemKind, CompletionList, CompletionParams, Position } from 'vscode-languageserver';
 import { expressionCollection } from './limboole-utils.js';
+import { CompletionProvider, CompletionProviderOptions } from 'langium/lsp';
+import { LimbooleServices } from './limboole-module.js';
+import { Expr, isExpr } from './generated/ast.js';
 
-export class LimbooleCompletionProvider extends LangiumCompletionParser {
+// Defines the completion provider class for the Limboole language.
+export class LimbooleCompletionProvider implements CompletionProvider {
+    
+    // Constructor accepting Limboole-specific services.
+    constructor(services: LimbooleServices) {}
 
-    constructor(services: LangiumCoreServices) {
-        super(services);
+    // Main entry point for code completion requests. Returns a list of completion items.
+    getCompletion(document: LangiumDocument, params: CompletionParams, cancelToken?: CancellationToken): MaybePromise<CompletionList | undefined> {
+        // Retrieve completion items based on the document and cursor position.
+        const items = this.provideCompletionItems(document, params.position);
+        
+        // Return the completion items as a CompletionList.
+        return CompletionList.create(items, true);
     }
+    
+    // Optional configuration for the completion provider (can be customized if needed).
+    completionOptions?: CompletionProviderOptions | undefined;
 
-    // Provide code completion items based on the current context
-    async provideCompletionItems(document: LangiumDocument, position: Position): Promise<CompletionItem[]> {
-        const currentNode = this.getNodeAtPosition(document, position);
-        const completions: CompletionItem[] = [];
+    // Generates completion items based on the current cursor position in the document.
+    provideCompletionItems(document: LangiumDocument, position: Position): CompletionItem[] {
+        // Extract the current input string from the document at the given position.
+        const currentInput = this.getCurrentInput(document, position);
 
-        // If we are at a position where a variable is expected, provide variable completions
-        if (this.isAtVariablePosition(currentNode)) {
-            completions.push(...this.getVariableCompletions());
+        // Get the AST node information at the cursor position.
+        const currentNodeInfo = this.getNodeAtPosition(currentInput, position);
+        
+        // If no valid node is found, return an empty list.
+        if (currentNodeInfo == undefined) return [];
+
+        // Check if the cursor is at a position where variables can be suggested.
+        if (this.isAtVariablePosition(currentNodeInfo.Node)) {
+            // Generate a list of matching variable completion items.
+            return this.getMatchingVariables(currentNodeInfo);
         }
 
-        return completions;
+        // Default to an empty list if no specific suggestions are applicable.
+        return [];
     }
 
-    // Retrieve the node at the given position in the document
-    getNodeAtPosition(document: LangiumDocument, position: Position) {
-        // Access the AST from the document's parseResult
-        const rootNode = document.parseResult.value;
-
-        // Use a utility function to traverse the AST and find the node at the given position
-        // You can create a utility function like `findNodeAtPosition` if needed
-        return this.findNodeAtPosition(rootNode, position);
+    // Extracts the current input string up to the cursor position for matching.
+    private getCurrentInput(document: LangiumDocument, position: Position): string {
+        const text = document.textDocument.getText(); // Full document text.
+        const offset = document.textDocument.offsetAt(position); // Cursor position offset.
+        const inputFragment = text.slice(0, offset); // Text up to the cursor.
+        const match = inputFragment.match(/[a-zA-Z0-9_]+$/); // Match valid variable names.
+        return match ? match[0] : ''; // Return the matched string or an empty string.
     }
 
-    // Traverse the AST and find the node at the given position
-    findNodeAtPosition(rootNode: any, position: Position): any {
-        // Implement a recursive traversal or stack-based DFS to find the correct node at the position
-        const stack = [rootNode];
+    // Retrieves a list of completion items for matching variable names.
+    private getMatchingVariables(nodeInfo: NodeInfo): CompletionItem[] {
+        const input = nodeInfo.Node!.var; // Current input string.
+        const variableNames = Object.keys(expressionCollection.getCollection()); // All variable names.
 
-        while (stack.length > 0) {
-            const currentNode = stack.pop() as any;
+        // Filter variables based on a fuzzy search condition.
+        const matches = variableNames.filter(varName => 
+            varName.toLowerCase().includes(input.toLowerCase()) && 
+            (varName.toLowerCase() !== input.toLowerCase() || nodeInfo.Occurences > 1)
+        );
 
-            // Check if the current node contains the position
-            if (this.isNodeAtPosition(currentNode, position)) {
-                return currentNode;
+        // Convert matches into CompletionItem objects for display in the editor.
+        return matches.map(varName => ({
+            label: varName, // The variable name to display.
+            kind: CompletionItemKind.Variable, // Mark this as a variable kind.
+            insertText: varName, // Text to insert when selected.
+            detail: `Variable: ${varName}`, // Additional detail about the variable.
+            documentation: { // Documentation for the variable (optional).
+                kind: 'markdown',
+                value: `**Variable Name:** \`${varName}\`\nThis matches your input: \`${input}\`.`
             }
-
-            // Traverse child nodes (if any)
-            if (currentNode.left) stack.push(currentNode.left);
-            if (currentNode.right) stack.push(currentNode.right);
-        }
-        return null; // Return null if no node was found at the position
-    }
-
-    // Check if a node is at the given position
-    isNodeAtPosition(node: any, position: Position): boolean {
-        // This is a placeholder for position matching logic
-        // You need to adjust this to match the actual logic of your AST structure
-        return node.start <= position.line && node.end >= position.line; // Example check
-    }
-
-    // Check if the node at the current position is a valid expression without a variable
-    private isAtVariablePosition(node: any): boolean {
-        return node && node.$type === 'Expr' && !node.var; // Example check, adapt as necessary
-    }
-
-    // Get variable completions based on the expressions stored in the collection
-    private getVariableCompletions(): CompletionItem[] {
-        // Retrieve all variables from the expression collection
-        const variableNames = Object.keys(expressionCollection.getCollection());
-
-        // Create completion items for each variable
-        return variableNames.map(varName => ({
-            label: varName,
-            kind: CompletionItemKind.Variable,
-            insertText: varName,  // The variable will be inserted as-is
-            detail: `Variable: ${varName}`,
-            documentation: `This is the variable: ${varName}`  // Add documentation for extra info
         }));
     }
+
+    // Checks whether the current AST node represents a valid position for variable completion.
+    private isAtVariablePosition(node: any): boolean {
+        return isExpr(node); // Uses a type guard to check if the node is an expression.
+    }
+
+    // Finds the AST node at the current position and returns related information.
+    private getNodeAtPosition(input: string, position: Position): NodeInfo | undefined {
+        return this.findNodeAtPosition(input, position);
+    }
+
+    // Searches the AST for a node at the specified position, relative to the current input.
+    private findNodeAtPosition(input: string, position: Position): NodeInfo | undefined {
+        const nodes = expressionCollection.getCollection()[input]; // Get nodes matching the input.
+
+        // Initialize node information structure.
+        var nodeAtPosition: NodeInfo = { Node: undefined, Occurences: 0 };
+
+        if (nodes == undefined) return nodeAtPosition; // Return if no nodes are found.
+
+        // Iterate through matching nodes to find the one at the current cursor position.
+        nodes.forEach((node) => {
+            nodeAtPosition.Occurences = nodeAtPosition.Occurences + 1; // Count occurrences.
+            
+            // Accept node if its position matches the cursor position.
+            if (node.$cstNode?.offset === (position.character - input.length)) {
+                nodeAtPosition.Node = node;
+            }
+        });
+
+        console.log(nodeAtPosition); // Debug log for development purposes.
+
+        return nodeAtPosition; // Return the identified node information.
+    }
+}
+
+// Interface representing information about a node and its occurrences.
+interface NodeInfo {    
+    Node: Expr | undefined; // The AST node.
+    Occurences: number; // Count of occurrences of the node.
 }

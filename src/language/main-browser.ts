@@ -9,6 +9,7 @@ import {
 } from 'vscode-languageserver/browser.js';
 import { createLimbooleServices } from './limboole-module.js';
 import { findAllBasicExpressions, expressionCollection } from './limboole-utils.js';
+import { CompletionItem, CompletionItemKind, Position } from 'vscode-languageserver';
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -50,7 +51,7 @@ shared.workspace.DocumentBuilder.onBuildPhase(DocumentState.Parsed, (documents) 
 
         // Access the list of variables
         const variablesList = expressionCollection.getVariablesList();
-        console.log('Extracted variables list:', variablesList);
+        // console.log('Extracted variables list:', variablesList);
 
         // Send the variables as a notification
         connection.sendNotification(documentChangeNotification, {
@@ -60,10 +61,4 @@ shared.workspace.DocumentBuilder.onBuildPhase(DocumentState.Parsed, (documents) 
             variables: variablesList // List of extracted variables
         });
     }
-});
-
-// Handle dynamic document changes (optional)
-connection.onNotification('browser/DocumentChange', (params: DocumentChange) => {
-    console.log('Document changed:', params.uri);
-    console.log('Extracted variables after change:', params.variables);
 });
