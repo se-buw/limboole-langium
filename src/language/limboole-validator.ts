@@ -67,4 +67,10 @@ function validateBinaryOperands(
             property: 'right'
         });
     }
+    if (expr.left == expr.right) {
+        accept('error', `Left and Right operand are the same for the  "${operatorName}" operator.`, {
+            node: expr,
+            property: 'right'
+        });
+    
 }

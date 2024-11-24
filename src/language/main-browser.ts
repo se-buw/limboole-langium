@@ -9,6 +9,7 @@ import {
 } from 'vscode-languageserver/browser.js';
 import { createLimbooleServices } from './limboole-module.js';
 import { findAllBasicExpressions, expressionCollection } from './limboole-utils.js';
+import { CompletionItem, CompletionItemKind, Position } from 'vscode-languageserver';
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -67,3 +68,39 @@ connection.onNotification('browser/DocumentChange', (params: DocumentChange) => 
     console.log('Document changed:', params.uri);
     console.log('Extracted variables after change:', params.variables);
 });
+
+// Handle completion requests
+connection.onRequest('textDocument/completion', async (params) => {
+    const { textDocument, position } = params;
+
+    // Get the document being edited from the workspace
+    const document = await shared.workspace.DocumentBuilder.get(textDocument.uri);
+    const text = document.textDocument.getText();
+
+    // Get the matching variables at the current cursor position
+    const variables = getMatchingVariables(text, position);
+
+    // Return completion items (variables) to the client
+    return {
+        items: variables.map(varName => ({
+            label: varName,
+            kind: CompletionItemKind.Variable,
+            insertText: varName,  // Insert the variable name when selected
+            documentation: {
+                kind: 'markdown',
+                value: `**Variable Name:** \`${varName}\`\nThis variable is used in your code.`
+            }
+        }))
+    };
+});
+
+/**
+ * Get matching variables from the text at the given position.
+ */
+function getMatchingVariables(text: string, position: Position): string[] {
+    // Extract the list of variables from expressionCollection
+    const variableNames = Object.keys(expressionCollection.getCollection());
+
+    // Optionally, you can filter variables based on the position (e.g., inside a certain scope)
+    return variableNames.filter(varName => varName.toLowerCase().includes(text.slice(0, position.character).toLowerCase()));
+}
