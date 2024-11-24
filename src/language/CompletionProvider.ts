@@ -30,6 +30,7 @@ export class LimbooleCompletionProvider implements CompletionProvider {
 
         const currentInput = this.getCurrentInput(document, position);
         const currentNodeInfo = this.getNodeAtPosition(currentInput, position);
+        
 
         if (currentNodeInfo == undefined) return [];
 
@@ -55,7 +56,7 @@ export class LimbooleCompletionProvider implements CompletionProvider {
         const variableNames = Object.keys(expressionCollection.getCollection());
         
         // TODO: implement fuzzy search
-        // Make sure code completion doesnt show the current input  
+        // Make sure code completion doesnt show the current input if no other occurence exists
         const matches = variableNames.filter(varName => 
             varName.toLowerCase().includes(input.toLowerCase()) && 
             (varName.toLowerCase() !== input.toLowerCase() || nodeInfo.Occurences > 1)
@@ -75,7 +76,6 @@ export class LimbooleCompletionProvider implements CompletionProvider {
     }
 
     private isAtVariablePosition(node: any): boolean {
-        
         return isExpr(node);
     }
 
@@ -86,25 +86,24 @@ export class LimbooleCompletionProvider implements CompletionProvider {
     private findNodeAtPosition(input : string, position: Position): NodeInfo | undefined {
         const nodes = expressionCollection.getCollection()[input];
 
-
-    
         var nodeAtPosition : NodeInfo = {Node: undefined, Occurences: 0};
+
+        if (nodes == undefined) return nodeAtPosition;
+
         nodes.forEach((node) => {
-            // console.log(node.$cstNode?.offset)
-            // console.log(position);
-            nodeAtPosition.Occurences = nodeAtPosition.Occurences++; 
+            
+            nodeAtPosition.Occurences = nodeAtPosition.Occurences + 1; 
+            // Accept node relative to cursor
             if(node.$cstNode?.offset === (position.character - input.length)){
                 nodeAtPosition.Node = node;
             }
         });
 
+        console.log(nodeAtPosition)
+
         return  nodeAtPosition;
     }
 
-
-    private isNodeAtPosition(node: any, position: Position): boolean {
-        return node.start <= position.line && node.end >= position.line;
-    }
 }
 
 interface NodeInfo{    
