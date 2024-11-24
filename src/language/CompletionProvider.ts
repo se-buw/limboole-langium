@@ -1,19 +1,41 @@
 // completion.ts or CompletionProvider.ts
-import { LangiumCompletionParser, LangiumDocument, LangiumCoreServices } from 'langium';
-import { CompletionItem, CompletionItemKind, Position } from 'vscode-languageserver';
+import { LangiumCompletionParser, LangiumDocument, LangiumCoreServices, MaybePromise } from 'langium';
+import { CancellationToken, CompletionItem, CompletionItemKind, CompletionList, CompletionParams, Position } from 'vscode-languageserver';
 import { expressionCollection } from './limboole-utils.js';
+import { CompletionProvider, CompletionProviderOptions } from 'langium/lsp';
+import { LimbooleServices } from './limboole-module.js';
+import { Expr, isExpr } from './generated/ast.js';
 
-export class LimbooleCompletionProvider extends LangiumCompletionParser {
-    constructor(services: LangiumCoreServices) {
-        super(services);
+
+
+export class LimbooleCompletionProvider implements CompletionProvider {
+    
+    
+    
+    constructor(services: LimbooleServices){
     }
 
-    async provideCompletionItems(document: LangiumDocument, position: Position): Promise<CompletionItem[]> {
-        const currentNode = this.getNodeAtPosition(document, position);
+    getCompletion(document: LangiumDocument, params: CompletionParams, cancelToken?: CancellationToken): MaybePromise<CompletionList | undefined> {
+       
 
-        if (this.isAtVariablePosition(currentNode)) {
-            const input = this.getCurrentInput(document, position);
-            return this.getMatchingVariables(input);
+        const items = this.provideCompletionItems(document,  params.position);
+        
+        return CompletionList.create(items, true);
+    }
+    
+    completionOptions?: CompletionProviderOptions | undefined;
+    
+
+    provideCompletionItems(document: LangiumDocument, position: Position): CompletionItem[] {
+
+        const currentInput = this.getCurrentInput(document, position);
+        const currentNodeInfo = this.getNodeAtPosition(currentInput, position);
+
+        if (currentNodeInfo == undefined) return [];
+
+        if (this.isAtVariablePosition(currentNodeInfo.Node)) {
+            
+            return this.getMatchingVariables(currentNodeInfo);
         }
 
         return [];
@@ -27,9 +49,18 @@ export class LimbooleCompletionProvider extends LangiumCompletionParser {
         return match ? match[0] : '';
     }
 
-    private getMatchingVariables(input: string): CompletionItem[] {
+    private getMatchingVariables(nodeInfo: NodeInfo): CompletionItem[] {
+
+        const input = nodeInfo.Node!.var;
         const variableNames = Object.keys(expressionCollection.getCollection());
-        const matches = variableNames.filter(varName => varName.toLowerCase().includes(input.toLowerCase()));
+        
+        // TODO: implement fuzzy search
+        // Make sure code completion doesnt show the current input  
+        const matches = variableNames.filter(varName => 
+            varName.toLowerCase().includes(input.toLowerCase()) && 
+            (varName.toLowerCase() !== input.toLowerCase() || nodeInfo.Occurences > 1)
+        );
+        
         
         return matches.map(varName => ({
             label: varName,
@@ -44,28 +75,39 @@ export class LimbooleCompletionProvider extends LangiumCompletionParser {
     }
 
     private isAtVariablePosition(node: any): boolean {
-        return node && node.$type === 'Expr' && !node.var;
+        
+        return isExpr(node);
     }
 
-    getNodeAtPosition(document: LangiumDocument, position: Position) {
-        const rootNode = document.parseResult.value;
-        return this.findNodeAtPosition(rootNode, position);
+    private getNodeAtPosition(input: string, position: Position) : NodeInfo | undefined {
+        return this.findNodeAtPosition(input, position);
     }
 
-    findNodeAtPosition(rootNode: any, position: Position): any {
-        const stack = [rootNode];
-        while (stack.length > 0) {
-            const currentNode = stack.pop() as any;
-            if (this.isNodeAtPosition(currentNode, position)) {
-                return currentNode;
+    private findNodeAtPosition(input : string, position: Position): NodeInfo | undefined {
+        const nodes = expressionCollection.getCollection()[input];
+
+
+    
+        var nodeAtPosition : NodeInfo = {Node: undefined, Occurences: 0};
+        nodes.forEach((node) => {
+            // console.log(node.$cstNode?.offset)
+            // console.log(position);
+            nodeAtPosition.Occurences = nodeAtPosition.Occurences++; 
+            if(node.$cstNode?.offset === (position.character - input.length)){
+                nodeAtPosition.Node = node;
             }
-            if (currentNode.left) stack.push(currentNode.left);
-            if (currentNode.right) stack.push(currentNode.right);
-        }
-        return null;
+        });
+
+        return  nodeAtPosition;
     }
 
-    isNodeAtPosition(node: any, position: Position): boolean {
+
+    private isNodeAtPosition(node: any, position: Position): boolean {
         return node.start <= position.line && node.end >= position.line;
     }
+}
+
+interface NodeInfo{    
+    Node: Expr | undefined;
+    Occurences: number;
 }
