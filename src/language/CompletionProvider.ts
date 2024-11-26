@@ -7,7 +7,7 @@ import { Expr, isExpr } from './generated/ast.js';
 
 // Defines the completion provider class for the Limboole language.
 export class LimbooleCompletionProvider implements CompletionProvider {
-    
+
     // Constructor accepting Limboole-specific services.
     constructor(services: LimbooleServices) {}
 
@@ -30,9 +30,11 @@ export class LimbooleCompletionProvider implements CompletionProvider {
 
         // Get the AST node information at the cursor position.
         const currentNodeInfo = this.getNodeAtPosition(currentInput, position);
-        
-        // If no valid node is found, return an empty list.
-        if (currentNodeInfo == undefined) return [];
+
+        // Check if currentNodeInfo is undefined or if no valid node is found, return an empty list.
+        if (!currentNodeInfo || !currentNodeInfo.Node) {
+            return [];
+        }
 
         // Check if the cursor is at a position where variables can be suggested.
         if (this.isAtVariablePosition(currentNodeInfo.Node)) {
@@ -40,8 +42,24 @@ export class LimbooleCompletionProvider implements CompletionProvider {
             return this.getMatchingVariables(currentNodeInfo);
         }
 
+        // Add additional completion cases as needed
+        // Example: Function completion, keyword completion
+        if (this.isAtFunctionPosition(currentNodeInfo.Node)) {
+            return this.getMatchingFunctions(currentNodeInfo);
+        }
+
+        if (this.isAtKeywordPosition(currentNodeInfo.Node)) {
+            return this.getMatchingKeywords(currentNodeInfo);
+        }
+
         // Default to an empty list if no specific suggestions are applicable.
         return [];
+    }
+    getMatchingKeywords(currentNodeInfo: NodeInfo): CompletionItem[] {
+        throw new Error('Method not implemented.');
+    }
+    getMatchingFunctions(currentNodeInfo: NodeInfo): CompletionItem[] {
+        throw new Error('Method not implemented.');
     }
 
     // Extracts the current input string up to the cursor position for matching.
@@ -61,7 +79,7 @@ export class LimbooleCompletionProvider implements CompletionProvider {
         // Filter variables based on a fuzzy search condition.
         const matches = variableNames.filter(varName => 
             varName.toLowerCase().includes(input.toLowerCase()) && 
-            (varName.toLowerCase() !== input.toLowerCase() || nodeInfo.Occurences > 1)
+            (varName.toLowerCase() !== input.toLowerCase() || nodeInfo.Occurrences > 1)
         );
 
         // Convert matches into CompletionItem objects for display in the editor.
@@ -82,6 +100,18 @@ export class LimbooleCompletionProvider implements CompletionProvider {
         return isExpr(node); // Uses a type guard to check if the node is an expression.
     }
 
+    // Checks whether the current AST node represents a valid position for function completion (stub).
+    private isAtFunctionPosition(node: any): boolean {
+        // Implement logic for checking if the node represents a function position.
+        return false;
+    }
+
+    // Checks whether the current AST node represents a valid position for keyword completion (stub).
+    private isAtKeywordPosition(node: any): boolean {
+        // Implement logic for checking if the node represents a keyword position.
+        return false;
+    }
+
     // Finds the AST node at the current position and returns related information.
     private getNodeAtPosition(input: string, position: Position): NodeInfo | undefined {
         return this.findNodeAtPosition(input, position);
@@ -92,21 +122,19 @@ export class LimbooleCompletionProvider implements CompletionProvider {
         const nodes = expressionCollection.getCollection()[input]; // Get nodes matching the input.
 
         // Initialize node information structure.
-        var nodeAtPosition: NodeInfo = { Node: undefined, Occurences: 0 };
+        var nodeAtPosition: NodeInfo = { Node: undefined, Occurrences: 0 };
 
         if (nodes == undefined) return nodeAtPosition; // Return if no nodes are found.
 
         // Iterate through matching nodes to find the one at the current cursor position.
         nodes.forEach((node) => {
-            nodeAtPosition.Occurences = nodeAtPosition.Occurences + 1; // Count occurrences.
+            nodeAtPosition.Occurrences = nodeAtPosition.Occurrences + 1; // Count occurrences.
             
             // Accept node if its position matches the cursor position.
             if (node.$cstNode?.offset === (position.character - input.length)) {
                 nodeAtPosition.Node = node;
             }
         });
-
-        console.log(nodeAtPosition); // Debug log for development purposes.
 
         return nodeAtPosition; // Return the identified node information.
     }
@@ -115,5 +143,5 @@ export class LimbooleCompletionProvider implements CompletionProvider {
 // Interface representing information about a node and its occurrences.
 interface NodeInfo {    
     Node: Expr | undefined; // The AST node.
-    Occurences: number; // Count of occurrences of the node.
+    Occurrences: number; // Count of occurrences of the node.
 }
