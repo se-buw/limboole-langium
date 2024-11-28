@@ -31,7 +31,6 @@ export const LimbooleModule: Module<LimbooleServices, PartialLangiumServices & L
     lsp: {
         CompletionProvider: (services) => new LimbooleCompletionProvider(services),
     }
-    
 };
 
 /**
