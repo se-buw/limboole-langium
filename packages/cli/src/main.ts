@@ -1,9 +1,8 @@
-import type { Expr } from '../language/generated/ast.js';
+import type { Expr } from 'limboole-language';
+import { createLimbooleServices, LimbooleLanguageMetaData } from 'limboole-language';
 import chalk from 'chalk';
 import { Command } from 'commander';
-import { LimbooleLanguageMetaData } from '../language/generated/module.js';
-import { createLimbooleServices } from '../language/limboole-module.js';
-import { extractAstNode } from './cli-util.js';
+import { extractAstNode } from './util.js';
 import { generateJavaScript } from './generator.js';
 import { NodeFileSystem } from 'langium/node';
 import * as url from 'node:url';
@@ -11,13 +10,13 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
-const packagePath = path.resolve(__dirname, '..', '..', 'package.json');
+const packagePath = path.resolve(__dirname, '..', 'package.json');
 const packageContent = await fs.readFile(packagePath, 'utf-8');
 
 export const generateAction = async (fileName: string, opts: GenerateOptions): Promise<void> => {
     const services = createLimbooleServices(NodeFileSystem).Limboole;
-    const expr = await extractAstNode<Expr>(fileName, services);
-    const generatedFilePath = generateJavaScript(expr, fileName, opts.destination);
+    const model = await extractAstNode<Expr>(fileName, services);
+    const generatedFilePath = generateJavaScript(model, fileName, opts.destination);
     console.log(chalk.green(`JavaScript code generated successfully: ${generatedFilePath}`));
 };
 

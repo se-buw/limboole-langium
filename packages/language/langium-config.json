@@ -1,0 +1,16 @@
+{
+    "projectName": "Limboole",
+    "languages": [
+        {
+            "id": "limboole",
+            "grammar": "src/limboole.langium",
+            "fileExtensions": [
+                "limboole"
+            ],
+            "textMate": {
+                "out": "syntaxes/limboole.tmLanguage.json"
+            }
+        }
+    ],
+    "out": "src/generated"
+}

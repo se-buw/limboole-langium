@@ -1,8 +1,8 @@
-import type { Expr } from '../language/generated/ast.js';
+import type { Expr } from 'limboole-language';
 import { expandToNode, joinToNode, toString } from 'langium/generate';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { extractDestinationAndName } from './cli-util.js';
+import { extractDestinationAndName } from './util.js';
 
 export function generateJavaScript(expr: Expr, filePath: string, destination: string | undefined): string {
     const data = extractDestinationAndName(filePath, destination);
